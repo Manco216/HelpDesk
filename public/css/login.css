@@ -1,0 +1,25 @@
+.login-shell{position:relative;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;background-color:#f3f4f6;background-image:url('https://socya.org.co/wp-content/uploads/ImagenesTI/background.png');background-position:center top;background-size:cover;background-repeat:no-repeat}
+.login-shell::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(255,255,255,.6) 40%,rgba(255,255,255,.4) 100%)}
+.login-box{position:relative;z-index:1;width:min(1080px,96vw);height:72vh;display:grid;grid-template-columns:1fr 1fr;border-radius:16px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,0.12);background:#fff}
+.login-left{background:#91bf5a;display:grid;place-items:center}
+.login-right{display:flex;align-items:stretch;justify-content:center;padding:32px 28px 28px 28px}
+.login-card{width:100%;max-width:420px;display:flex;flex-direction:column;height:100%}
+.login-header{width:100%;min-height:140px;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(255,255,255,.92);border-bottom:1px solid #e5e7eb}
+.login-center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.login-logo{height:120px;width:auto;display:block;margin:0 auto}
+.login-title{font-size:28px;font-weight:700;color:#111827;margin:0 0 8px 0;text-align:center}
+.login-sub{font-size:16px;color:#4b5563;margin:0 0 18px 0;text-align:center}
+.google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#285f20;border:2px solid #91bf5a;border-radius:9999px;padding:10px 14px;font-weight:600;box-shadow:0 4px 10px rgba(0,0,0,0.06);transition:all .15s ease;margin-top:auto;margin-bottom:40px;cursor:pointer}
+.google-btn:hover{background:#91bf5a;color:#fff;transform:translateY(2px)}
+.google-logo{width:18px;height:18px;display:inline-flex}
+.google-text{display:inline-flex}
+.google-spinner{width:16px;height:16px;border:2px solid #91bf5a;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;display:none}
+.google-btn.loading .google-spinner{display:inline-flex}
+.google-btn.loading .google-logo{display:none}
+@keyframes spin {to{transform:rotate(360deg)}}
+.login-illustration{width:min(460px,90%);max-height:58vh;object-fit:contain;display:block;margin:auto}
+@media (max-width: 720px){
+    .login-box{grid-template-columns:1fr;height:auto}
+    .login-left{display:none}
+    .login-right{padding:22px}
+}

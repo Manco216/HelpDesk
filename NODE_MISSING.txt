@@ -1,0 +1,5 @@
+Node.js y NPM no fueron encontrados en el sistema.
+Por favor instala Node.js desde https://nodejs.org/
+Una vez instalado, podrás ejecutar:
+npm install
+npm run dev
