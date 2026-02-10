@@ -515,11 +515,15 @@ Route::get('/api/catalog/categories', function () {
     if (!Schema::hasTable($cat)) {
         return response()->json([], 200);
     }
-    $rows = Cache::remember('catalog:categories:' . $prefix, 300, function () use ($cat) {
-        return DB::table($cat)
-            ->select('id_categoria', 'nombre_categoria')
-            ->orderBy('nombre_categoria', 'asc')
-            ->get();
+    $req = request();
+    $q = trim((string)($req->query('q') ?? ''));
+    $rows = Cache::remember('catalog:categories:' . $prefix . ':' . md5($q), 300, function () use ($cat, $q) {
+        $builder = DB::table($cat)
+            ->select('id_categoria', 'nombre_categoria');
+        if ($q !== '') {
+            $builder->where('nombre_categoria', 'like', '%' . $q . '%');
+        }
+        return $builder->orderBy('nombre_categoria', 'asc')->limit(500)->get();
     });
     return response()->json($rows, 200);
 });
@@ -532,11 +536,15 @@ Route::get('/api/catalog/departments', function () {
     if (!Schema::hasTable($dept)) {
         return response()->json([], 200);
     }
-    $rows = Cache::remember('catalog:departments:' . $prefix, 300, function () use ($dept) {
-        return DB::table($dept)
-            ->select('id_departamento', 'nombre_departamento')
-            ->orderBy('nombre_departamento', 'asc')
-            ->get();
+    $req = request();
+    $q = trim((string)($req->query('q') ?? ''));
+    $rows = Cache::remember('catalog:departments:' . $prefix . ':' . md5($q), 300, function () use ($dept, $q) {
+        $builder = DB::table($dept)
+            ->select('id_departamento', 'nombre_departamento');
+        if ($q !== '') {
+            $builder->where('nombre_departamento', 'like', '%' . $q . '%');
+        }
+        return $builder->orderBy('nombre_departamento', 'asc')->limit(500)->get();
     });
     return response()->json($rows, 200);
 });
@@ -583,11 +591,15 @@ Route::get('/api/catalog/users', function () {
     if (!Schema::hasTable($usuario)) {
         return response()->json([], 200);
     }
-    $rows = Cache::remember('catalog:users:' . $prefix, 300, function () use ($usuario) {
-        return DB::table($usuario)
-            ->select('id_usuario', 'nombre_usuario')
-            ->orderBy('nombre_usuario', 'asc')
-            ->get();
+    $req = request();
+    $q = trim((string)($req->query('q') ?? ''));
+    $rows = Cache::remember('catalog:users:' . $prefix . ':' . md5($q), 300, function () use ($usuario, $q) {
+        $builder = DB::table($usuario)
+            ->select('id_usuario', 'nombre_usuario');
+        if ($q !== '') {
+            $builder->where('nombre_usuario', 'like', '%' . $q . '%');
+        }
+        return $builder->orderBy('nombre_usuario', 'asc')->limit(500)->get();
     });
     return response()->json($rows, 200);
 });

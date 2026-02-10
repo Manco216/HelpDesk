@@ -127,6 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             credentials: 'same-origin'
                         });
                     } catch (err) {}
+                    try { localStorage.removeItem('HelpdeskSearchState'); } catch (_) {}
+                    try { localStorage.removeItem('HelpdeskCatalogsV1'); } catch (_) {}
                     const loginUrl = (window.AppConfig && window.AppConfig.baseUrl) ? (window.AppConfig.baseUrl + '/login') : '/login';
                     window.location.assign(loginUrl);
                 });
@@ -221,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <select id="request-process" name="process">
                             <option value="">Selecciona un proceso</option>
                         </select>
+                        <div class="field-help process-required-msg">Selecciona un proceso para habilitar el formulario</div>
                     </div>
                     <div class="request-form-body">
                     <div class="field">
@@ -542,6 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 requestModalBackdrop.classList.add('active');
                 requestModal.classList.add('active');
                 document.body.style.overflow = 'hidden';
+                if (typeof updateFormEnabled === 'function') updateFormEnabled();
             };
             const closeRequestModal = () => {
                 requestModalBackdrop.classList.remove('active');
@@ -552,23 +556,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 searchModalBackdrop.classList.add('active');
                 searchModal.classList.add('active');
                 document.body.style.overflow = 'hidden';
+                const body = searchModal.querySelector('.search-results-body');
+                if (body) body.innerHTML = '';
+                searchResults.classList.remove('active');
+                const resetEl = (sel) => { const el = searchForm.querySelector(sel); if (el) el.value = ''; };
+                resetEl('#search-reported-by');
+                resetEl('#search-problem-id');
+                resetEl('#search-assigned-to');
+                resetEl('#search-category');
+                resetEl('#search-department');
+                resetEl('#search-status');
+                resetEl('#search-priority');
+                resetEl('#search-keywords');
+                resetEl('#search-date-from');
+                resetEl('#search-date-to');
+                const ordEl = searchForm.querySelector('input[name="order_by"][value="id"]');
+                if (ordEl) ordEl.checked = true;
                 if (typeof loadSearchDropdowns === 'function') {
                     const p = loadSearchDropdowns();
                     if (p && typeof p.then === 'function') {
-                        p.then(() => {
-                            if (typeof restoreSearchFormState === 'function') {
-                                restoreSearchFormState();
-                            }
-                        });
+                        p.then(() => {});
                     } else {
-                        if (typeof restoreSearchFormState === 'function') {
-                            restoreSearchFormState();
-                        }
+                        {}
                     }
                 } else {
-                    if (typeof restoreSearchFormState === 'function') {
-                        restoreSearchFormState();
-                    }
+                    {}
                 }
             };
             const closeSearchModal = () => {
@@ -642,6 +654,132 @@ document.addEventListener('DOMContentLoaded', () => {
             const searchStatusSelect = searchModal.querySelector('#search-status');
             const searchPrioritySelect = searchModal.querySelector('#search-priority');
             const searchAssignedToSelect = searchModal.querySelector('#search-assigned-to');
+            const initSearchableSelect = (selectEl, items, idKey, nameKey) => {
+                if (!selectEl || selectEl.dataset.searchableInitialized === '1') return;
+                const field = selectEl.closest('.field') || selectEl.parentElement;
+                if (!field) return;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'searchable-select';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'searchable-input';
+                input.placeholder = 'Escribe para buscar...';
+                const list = document.createElement('div');
+                list.className = 'searchable-list';
+                wrapper.appendChild(input);
+                wrapper.appendChild(list);
+                field.insertBefore(wrapper, selectEl);
+                try { selectEl.style.display = 'none'; } catch {}
+                const render = (q) => {
+                    const query = (q || '').toLowerCase();
+                    const arr = Array.isArray(items) ? items : [];
+                    const filtered = arr.filter((it) => {
+                        const nm = String(it[nameKey] ?? '').toLowerCase();
+                        return query === '' ? true : nm.includes(query);
+                    }).slice(0, 50);
+                    const anyItem = { [idKey]: '', [nameKey]: 'Cualquiera' };
+                    const final = query === '' ? [anyItem].concat(filtered) : filtered;
+                    list.innerHTML = final.map((it) => {
+                        const id = String(it[idKey] ?? '');
+                        const nm = String(it[nameKey] ?? '');
+                        return `<div class="searchable-item" data-id="${id}">${nm}</div>`;
+                    }).join('');
+                };
+                input.addEventListener('focus', () => {
+                    render(input.value);
+                    list.style.display = 'block';
+                });
+                input.addEventListener('input', () => {
+                    render(input.value);
+                    list.style.display = 'block';
+                });
+                document.addEventListener('click', (e) => {
+                    if (!wrapper.contains(e.target)) {
+                        list.style.display = 'none';
+                    }
+                });
+                list.addEventListener('click', (e) => {
+                    const item = e.target.closest('.searchable-item');
+                    if (!item) return;
+                    const id = item.getAttribute('data-id') || '';
+                    selectEl.value = id;
+                    const nm = item.textContent || '';
+                    input.value = id ? nm : '';
+                    list.style.display = 'none';
+                });
+                const applyCurrent = () => {
+                    const cur = selectEl.value;
+                    if (!cur) { input.value = ''; return; }
+                    const hit = (Array.isArray(items) ? items : []).find((it) => String(it[idKey] ?? '') === String(cur));
+                    input.value = hit ? String(hit[nameKey] ?? '') : '';
+                };
+                applyCurrent();
+                selectEl.addEventListener('change', applyCurrent);
+                selectEl.dataset.searchableInitialized = '1';
+            };
+            const initSearchableSelectRemoteUsers = (selectEl) => {
+                if (!selectEl || selectEl.dataset.searchableInitialized === '1') return;
+                const field = selectEl.closest('.field') || selectEl.parentElement;
+                if (!field) return;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'searchable-select';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'searchable-input';
+                input.placeholder = 'Escribe para buscar usuarios...';
+                const list = document.createElement('div');
+                list.className = 'searchable-list';
+                wrapper.appendChild(input);
+                wrapper.appendChild(list);
+                field.insertBefore(wrapper, selectEl);
+                try { selectEl.style.display = 'none'; } catch {}
+                let ac = null;
+                let timer = null;
+                const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
+                const renderItems = (items) => {
+                    const anyItem = { id_usuario: '', nombre_usuario: 'Cualquiera' };
+                    const final = (input.value.trim() === '' ? [anyItem] : []).concat((Array.isArray(items) ? items : []).slice(0, 50));
+                    list.innerHTML = final.map((it) => {
+                        const id = String(it.id_usuario ?? '');
+                        const nm = String(it.nombre_usuario ?? '');
+                        return `<div class="searchable-item" data-id="${id}">${nm}</div>`;
+                    }).join('');
+                };
+                const fetchUsers = async (q) => {
+                    if (ac) try { ac.abort(); } catch {}
+                    ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+                    const url = (base ? base : '') + '/api/catalog/users' + (q ? ('?q=' + encodeURIComponent(q)) : '');
+                    try {
+                        const res = await fetch(url, ac ? { signal: ac.signal } : {});
+                        const data = res.ok ? await res.json() : [];
+                        renderItems(data);
+                        list.style.display = 'block';
+                    } catch (_) {}
+                };
+                input.addEventListener('focus', () => {
+                    fetchUsers('');
+                });
+                input.addEventListener('input', () => {
+                    if (timer) clearTimeout(timer);
+                    const q = input.value.trim();
+                    timer = setTimeout(() => fetchUsers(q), 250);
+                });
+                document.addEventListener('click', (e) => {
+                    if (!wrapper.contains(e.target)) {
+                        list.style.display = 'none';
+                    }
+                });
+                list.addEventListener('click', (e) => {
+                    const item = e.target.closest('.searchable-item');
+                    if (!item) return;
+                    const id = item.getAttribute('data-id') || '';
+                    selectEl.value = id;
+                    const nm = item.textContent || '';
+                    input.value = id ? nm : '';
+                    list.style.display = 'none';
+                });
+                selectEl.dataset.searchableInitialized = '1';
+            };
             const loadSearchDropdowns = async () => {
                 const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
                 const setOptions = (el, items, idKey, nameKey, anyLabel) => {
@@ -677,6 +815,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     setOptions(searchStatusSelect, cached.sts || [], 'id_estado', 'nombre_estado', 'Cualquiera');
                     setOptions(searchPrioritySelect, cached.pri || [], 'id_prioridad', 'nombre_prioridad', 'Cualquiera');
                     setOptions(searchAssignedToSelect, cached.usr || [], 'id_usuario', 'nombre_usuario', 'Cualquiera');
+                    initSearchableSelect(searchCategorySelect, cached.cats || [], 'id_categoria', 'nombre_categoria');
+                    initSearchableSelect(searchAssignedToSelect, cached.usr || [], 'id_usuario', 'nombre_usuario');
+                    initSearchableSelect(searchDepartmentSelect, cached.deps || [], 'id_departamento', 'nombre_departamento');
                 }
                 const fetchAndUpdate = async () => {
                     const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -699,6 +840,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         setOptions(searchStatusSelect, sts, 'id_estado', 'nombre_estado', 'Cualquiera');
                         setOptions(searchPrioritySelect, pri, 'id_prioridad', 'nombre_prioridad', 'Cualquiera');
                         setOptions(searchAssignedToSelect, usr, 'id_usuario', 'nombre_usuario', 'Cualquiera');
+                        initSearchableSelect(searchCategorySelect, cats, 'id_categoria', 'nombre_categoria');
+                        initSearchableSelect(searchAssignedToSelect, usr, 'id_usuario', 'nombre_usuario');
+                        initSearchableSelect(searchDepartmentSelect, deps, 'id_departamento', 'nombre_departamento');
                         try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), cats, deps, sts, pri, usr })); } catch {}
                     } catch (_) {} finally { clearTimeout(t); }
                 };
@@ -805,6 +949,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const requestSubmit = requestModal.querySelector('.request-submit');
             const fileDropzoneRoot = requestModal.querySelector('.file-dropzone');
             const requestFormBody = requestModal.querySelector('.request-form-body');
+            const processRequiredMsg = requestModal.querySelector('.process-required-msg');
+            let requestSubmitLock = false;
+            let requestSubmitLastTs = 0;
             const populateProcesses = async () => {
                 try {
                     const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
@@ -863,22 +1010,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } catch (err) {}
             };
+            const updateFormEnabled = () => {
+                const enabled = !!(processSelect && processSelect.value);
+                if (categorySelect) categorySelect.disabled = !enabled;
+                if (descriptionInput) descriptionInput.disabled = !enabled;
+                if (filesInput) filesInput.disabled = !enabled;
+                if (requestSubmit) requestSubmit.disabled = !enabled;
+                if (fileDropzoneRoot) {
+                    if (!enabled) fileDropzoneRoot.classList.add('disabled');
+                    else fileDropzoneRoot.classList.remove('disabled');
+                }
+                if (requestFormBody) {
+                    if (!enabled) requestFormBody.classList.add('disabled');
+                    else requestFormBody.classList.remove('disabled');
+                }
+                if (processRequiredMsg) {
+                    processRequiredMsg.style.display = enabled ? 'none' : 'block';
+                }
+            };
             if (processSelect) {
-                const updateFormEnabled = () => {
-                    const enabled = !!processSelect.value;
-                    if (categorySelect) categorySelect.disabled = !enabled;
-                    if (descriptionInput) descriptionInput.disabled = !enabled;
-                    if (filesInput) filesInput.disabled = !enabled;
-                    if (requestSubmit) requestSubmit.disabled = !enabled;
-                    if (fileDropzoneRoot) {
-                        if (!enabled) fileDropzoneRoot.classList.add('disabled');
-                        else fileDropzoneRoot.classList.remove('disabled');
-                    }
-                    if (requestFormBody) {
-                        if (!enabled) requestFormBody.classList.add('disabled');
-                        else requestFormBody.classList.remove('disabled');
-                    }
-                };
                 updateFormEnabled();
                 processSelect.addEventListener('change', () => {
                     const v = processSelect.value;
@@ -901,8 +1051,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     filesInput.__selectedFiles = [];
                     try { filesInput.value = ''; } catch {}
                     if (typeof DataTransfer !== 'undefined') {
-                        const dt = new DataTransfer();
-                        filesInput.files = dt.files;
+                        try {
+                            const dt = new DataTransfer();
+                            filesInput.files = dt.files;
+                        } catch {}
                     }
                     const dz = requestModal.querySelector('.file-dropzone');
                     if (dz) {
@@ -915,21 +1067,33 @@ document.addEventListener('DOMContentLoaded', () => {
                         dz.classList.remove('has-files');
                     }
                 }
+                updateFormEnabled();
             };
             if (requestForm && categorySelect && descriptionInput) {
                 requestForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
+                    const nowTs = Date.now();
+                    if (requestSubmitLock || (nowTs - requestSubmitLastTs) < 1000) return;
+                    requestSubmitLock = true;
+                    requestSubmitLastTs = nowTs;
+                    if (requestSubmit) requestSubmit.disabled = true;
                     if (!processSelect || !processSelect.value) {
+                        requestSubmitLock = false;
+                        if (requestSubmit) requestSubmit.disabled = false;
                         alert('Selecciona un proceso.');
                         return;
                     }
                     const cat = categorySelect.value;
                     const desc = descriptionInput.value.trim();
                     if (!cat) {
+                        requestSubmitLock = false;
+                        if (requestSubmit) requestSubmit.disabled = false;
                         alert('Selecciona una categoría.');
                         return;
                     }
                     if (!desc) {
+                        requestSubmitLock = false;
+                        if (requestSubmit) requestSubmit.disabled = false;
                         alert('Escribe una descripción.');
                         return;
                     }
@@ -952,6 +1116,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             } else {
                                 alert('No se pudo crear el ticket.');
                             }
+                            requestSubmitLock = false;
+                            if (requestSubmit) requestSubmit.disabled = false;
                             return;
                         }
                         await res.json();
@@ -960,8 +1126,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             alert('El ticket se generó correctamente.');
                         }
+                        resetRequestForm();
                         closeRequestModal();
                     } catch (_) {}
+                    finally {
+                        setTimeout(() => {
+                            requestSubmitLock = false;
+                            if (requestSubmit) requestSubmit.disabled = false;
+                        }, 1000);
+                    }
                 });
             }
             const searchForm = searchModal.querySelector('.search-form');
@@ -1054,25 +1227,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                         searchResults.classList.add('active');
-                        try {
-                            const state = {
-                                form: {
-                                    reported_by: reportedBy,
-                                    problem_id: problemId,
-                                    assigned_to: assignedTo,
-                                    category_id: categoryId,
-                                    department_id: departmentId,
-                                    status_id: statusId,
-                                    priority_id: priorityId,
-                                    keywords,
-                                    date_from: dateFrom,
-                                    date_to: dateTo,
-                                    order_by: orderBy,
-                                },
-                                results: Array.isArray(data) ? data : [],
-                            };
-                            localStorage.setItem('HelpdeskSearchState', JSON.stringify(state));
-                        } catch (_) {}
                     } catch (err) {
                         const body = searchModal.querySelector('.search-results-body');
                         if (body) {
