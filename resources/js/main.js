@@ -1,4 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const st = document.createElement('style');
+        st.textContent = '.ticket-details-edit{display:none!important;pointer-events:none!important;}';
+        document.head.appendChild(st);
+        let tries = 0;
+        const rmAll = () => {
+            const xs = document.querySelectorAll('.ticket-details-edit');
+            if (xs && xs.length) xs.forEach((n) => { try { n.remove(); } catch (_) {} });
+            if (++tries >= 30) { try { clearInterval(tid); } catch (_) {} }
+        };
+        const tid = setInterval(rmAll, 300);
+        rmAll();
+        const moBody = (typeof MutationObserver !== 'undefined') ? new MutationObserver(rmAll) : null;
+        if (moBody) moBody.observe(document.body, { childList: true, subtree: true });
+        document.body.addEventListener('click', (e) => {
+            const t = e.target;
+            if (t && t.classList && t.classList.contains('ticket-details-edit')) {
+                e.preventDefault();
+                try { t.remove(); } catch (_) {}
+            }
+        }, true);
+    } catch (_) {}
     const initLayout = () => {
         // ============================================
         // 1. CREAR O VALIDAR SIDEBAR
@@ -952,6 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const processRequiredMsg = requestModal.querySelector('.process-required-msg');
             let requestSubmitLock = false;
             let requestSubmitLastTs = 0;
+            let editingTicketId = null;
             const populateProcesses = async () => {
                 try {
                     const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
@@ -1044,6 +1067,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
             const resetRequestForm = () => {
+                const hdr = requestModal.querySelector('.request-modal-header h3');
+                if (hdr) hdr.textContent = 'Nueva solicitud';
+                if (requestSubmit) requestSubmit.textContent = 'Enviar petición';
+                editingTicketId = null;
                 if (processSelect) processSelect.value = '';
                 if (categorySelect) categorySelect.innerHTML = '<option value="">Selecciona una categoría</option>';
                 if (descriptionInput) descriptionInput.value = '';
@@ -1069,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 updateFormEnabled();
             };
+            const beginEditTicket = async (ticket) => {};
             if (requestForm && categorySelect && descriptionInput) {
                 requestForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
@@ -1111,21 +1139,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                         const res = await fetch(url, { method: 'POST', body: fd });
                         if (!res.ok) {
-                            if (window.Alertas && typeof window.Alertas.showError === 'function') {
-                                window.Alertas.showError('No se pudo crear el ticket.');
-                            } else {
-                                alert('No se pudo crear el ticket.');
-                            }
+                            if (window.Alertas && typeof window.Alertas.showError === 'function') { window.Alertas.showError('No se pudo crear el ticket.'); } else { alert('No se pudo crear el ticket.'); }
                             requestSubmitLock = false;
                             if (requestSubmit) requestSubmit.disabled = false;
                             return;
                         }
                         await res.json();
-                        if (window.Alertas && typeof window.Alertas.showSuccess === 'function') {
-                            window.Alertas.showSuccess('El ticket se generó correctamente.');
-                        } else {
-                            alert('El ticket se generó correctamente.');
-                        }
+                        if (window.Alertas && typeof window.Alertas.showSuccess === 'function') { window.Alertas.showSuccess('El ticket se generó correctamente.'); } else { alert('El ticket se generó correctamente.'); }
                         resetRequestForm();
                         closeRequestModal();
                     } catch (_) {}
@@ -1257,6 +1277,19 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             document.body.appendChild(ticketDetailsBackdrop);
             document.body.appendChild(ticketDetailsModal);
+            try {
+                const eb = ticketDetailsModal.querySelector('.ticket-details-edit');
+                if (eb) eb.remove();
+            } catch (_) {}
+            try {
+                const rm = () => {
+                    const xs = ticketDetailsModal.querySelectorAll('.ticket-details-edit');
+                    if (xs && xs.length) xs.forEach((n) => { try { n.remove(); } catch (_) {} });
+                };
+                rm();
+                const mo = (typeof MutationObserver !== 'undefined') ? new MutationObserver(rm) : null;
+                if (mo) mo.observe(ticketDetailsModal, { childList: true, subtree: true });
+            } catch (_) {}
             const openTicketDetails = () => {
                 ticketDetailsBackdrop.classList.add('active');
                 ticketDetailsModal.classList.add('active');
@@ -1322,6 +1355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                     }
                     openTicketDetails();
+                    
                 } catch (_) {}
             };
             searchModal.addEventListener('click', (e) => {

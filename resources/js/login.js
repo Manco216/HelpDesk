@@ -12,6 +12,81 @@
   try {
     window.firebase.initializeApp(firebaseConfig);
   } catch (_) {}
+  const preloadImg = (url) => new Promise((resolve, reject) => {
+    if (!url) return resolve(false);
+    const im = new Image();
+    im.onload = () => resolve(true);
+    im.onerror = () => reject(false);
+    im.src = url;
+  });
+  const loadBackground = async () => {
+    const shell = document.querySelector('.login-shell');
+    if (!shell) return;
+    const webp = 'https://socya.org.co/wp-content/uploads/ImagenesTI/background.webp';
+    const png = 'https://socya.org.co/wp-content/uploads/ImagenesTI/background.png';
+    try {
+      await preloadImg(webp);
+      shell.style.backgroundImage = "url('" + webp + "')";
+    } catch (_) {
+      try {
+        await preloadImg(png);
+        shell.style.backgroundImage = "url('" + png + "')";
+      } catch (_e) {}
+    }
+  };
+  const lazyIllustration = () => new Promise((resolve) => {
+    const img = document.querySelector('.login-illustration');
+    if (!img) return resolve(false);
+    const realSrc = img.getAttribute('data-src') || img.getAttribute('src');
+    const setLoaded = () => {
+      try {
+        const wrap = img.closest('.login-illustration-wrap');
+        const w = img.naturalWidth || 480;
+        const h = img.naturalHeight || 360;
+        if (wrap && w > 0 && h > 0) wrap.style.aspectRatio = w + ' / ' + h;
+        img.classList.add('loaded');
+      } catch (_) {}
+      resolve(true);
+    };
+    const setFallback = () => {
+      try {
+        const u = new URL(realSrc, window.location.origin);
+        const fallback = new URL(window.location.origin);
+        fallback.port = '';
+        u.protocol = fallback.protocol;
+        u.hostname = fallback.hostname;
+        u.port = fallback.port;
+        img.src = u.href;
+      } catch (_) {
+        try { img.src = String(realSrc || '').replace(':8080', ''); } catch (__){}
+      }
+    };
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            io.disconnect();
+            if (img.src !== realSrc) img.src = realSrc;
+            img.onerror = setFallback;
+            if (img.decode) { img.decode().then(setLoaded).catch(setLoaded); }
+            else { if (img.complete) setLoaded(); else img.onload = setLoaded; }
+          }
+        });
+      }, { rootMargin: '120px' });
+      io.observe(img);
+    } else {
+      if (img.src !== realSrc) img.src = realSrc;
+      img.onerror = setFallback;
+      if (img.decode) { img.decode().then(setLoaded).catch(setLoaded); }
+      else { if (img.complete) setLoaded(); else img.onload = setLoaded; }
+    }
+  });
+  (async () => {
+    try { await loadBackground(); } catch (_) {}
+    try { document.body.classList.add('bg-ready'); } catch (_) {}
+    try { await lazyIllustration(); } catch (_) {}
+    try { document.body.classList.add('login-ready'); } catch (_) {}
+  })();
   const btn = document.getElementById('googleLoginBtn');
   const showError = (msg) => {
     if (window.Alertas) window.Alertas.showError(msg);

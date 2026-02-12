@@ -30,6 +30,40 @@
         <script defer src="{{ asset('js/alertas.js') }}"></script>
 
     @endif
+    @php
+        $prefix = env('DB_PREFIX', '');
+        $t = function(string $nm) use ($prefix) {
+            return ($prefix !== '' && $prefix !== 'tbl_') ? preg_replace('/^tbl_/i', $prefix, $nm) : $nm;
+        };
+        $usuario = $t('tbl_usuario');
+        $departamento = $t('tbl_departamento');
+        $deptName = '';
+        $uid = (int)(session('user_id') ?? 0);
+        if ($uid > 0 && \Illuminate\Support\Facades\Schema::hasTable($usuario)) {
+            $user = \Illuminate\Support\Facades\DB::table($usuario)->where('id_usuario', $uid)->first();
+            if ($user) {
+                $deptId = null;
+                if (\Illuminate\Support\Facades\Schema::hasColumn($usuario, 'fk_id_departamento')) $deptId = $user->fk_id_departamento;
+                elseif (\Illuminate\Support\Facades\Schema::hasColumn($usuario, 'id_departamento')) $deptId = $user->id_departamento;
+                if ($deptId && \Illuminate\Support\Facades\Schema::hasTable($departamento)) {
+                    $deptNameCol = \Illuminate\Support\Facades\Schema::hasColumn($departamento, 'nombre_departamento') ? 'nombre_departamento' : (\Illuminate\Support\Facades\Schema::hasColumn($departamento, 'nombre') ? 'nombre' : null);
+                    if ($deptNameCol) {
+                        $d = \Illuminate\Support\Facades\DB::table($departamento)->where('id_departamento', $deptId)->first();
+                        if ($d && isset($d->$deptNameCol)) $deptName = (string)$d->$deptNameCol;
+                    }
+                }
+            }
+        }
+    @endphp
+    <script>
+        window.AppConfig = Object.assign(window.AppConfig || {}, {
+            baseUrl: "{{ url('/') }}",
+            loginGoogle: "{{ url('/login/google') }}",
+            userName: "{{ (string)session('user_name', '') }}",
+            userEmail: "{{ (string)session('user_email', '') }}",
+            userDeptName: "{{ $deptName }}"
+        });
+    </script>
 </head>
 <body>
 

@@ -57,3 +57,21 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Dashboard (Barras)
+
+- Endpoint: GET /api/dashboard/bars
+- Filtros: period, year, month, process_id, group
+- Seguridad:
+  - Requiere sesión activa y dominio permitido (ALLOWED_EMAIL_DOMAINS)
+  - Valida que el usuario tenga departamento asignado; si no, 403 (department_not_assigned)
+- Alcance de datos:
+  - Retorna sólo tickets cuyas categorías pertenecen a procesos del departamento del usuario
+  - group=month devuelve 12 meses (Ene–Dic) basados en created_at/fecha_creacion
+- Logs:
+  - Registra user_id, dept_id, filtros y columna de fecha utilizada
+- Frontend:
+  - dashboard.js muestra mensajes claros en errores (no autorizado, sin departamento, conexión)
+- Pruebas:
+  - tests/Feature/DashboardBarsDepartmentFilterTest.php verifica el filtrado por departamento
+  - Ejecutar pruebas con vendor/bin/phpunit cuando phpunit esté instalado

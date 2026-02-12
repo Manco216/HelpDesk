@@ -1,4 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const st = document.createElement('style');
+        st.textContent = '.ticket-details-edit{display:none!important;pointer-events:none!important;}';
+        document.head.appendChild(st);
+        let tries = 0;
+        const rmAll = () => {
+            const xs = document.querySelectorAll('.ticket-details-edit');
+            if (xs && xs.length) xs.forEach((n) => { try { n.remove(); } catch (_) {} });
+            if (++tries >= 30) { try { clearInterval(tid); } catch (_) {} }
+        };
+        const tid = setInterval(rmAll, 300);
+        rmAll();
+        const moBody = (typeof MutationObserver !== 'undefined') ? new MutationObserver(rmAll) : null;
+        if (moBody) moBody.observe(document.body, { childList: true, subtree: true });
+        document.body.addEventListener('click', (e) => {
+            const t = e.target;
+            if (t && t.classList && t.classList.contains('ticket-details-edit')) {
+                e.preventDefault();
+                try { t.remove(); } catch (_) {}
+            }
+        }, true);
+    } catch (_) {}
     const initLayout = () => {
         // ============================================
         // 1. CREAR O VALIDAR SIDEBAR
@@ -279,19 +301,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div class="field">
                                 <label for="search-assigned-to">Asignado a</label>
-                                <select id="search-assigned-to" name="assigned_to">
+                                <select id="search-assigned-to" name="assigned_to" style="display:none">
                                     <option value="">Cualquiera</option>
                                 </select>
                             </div>
                             <div class="field">
                                 <label for="search-category">Categoría</label>
-                                <select id="search-category" name="category">
+                                <select id="search-category" name="category" style="display:none">
                                     <option value="">Cualquiera</option>
                                 </select>
                             </div>
                             <div class="field">
                                 <label for="search-department">Departamento</label>
-                                <select id="search-department" name="department">
+                                <select id="search-department" name="department" style="display:none">
                                     <option value="">Cualquiera</option>
                                 </select>
                             </div>
@@ -370,6 +392,240 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sf && searchResults) {
                 searchModal.insertBefore(searchResults, sf);
             }
+            const adminCategoriesBackdrop = document.createElement('div');
+            adminCategoriesBackdrop.className = 'admin-categories-backdrop';
+            const adminCategoriesModal = document.createElement('div');
+            adminCategoriesModal.className = 'admin-categories-modal';
+            adminCategoriesModal.innerHTML = `
+                <div class="admin-categories-inner">
+                    <div class="admin-categories-header">
+                        <div class="admin-categories-title-row">
+                            <h3>Categorías</h3>
+                            <button type="button" class="admin-categories-close" title="Cerrar">&times;</button>
+                        </div>
+                        <div class="admin-categories-actions-row">
+                            <input type="text" class="admin-categories-search" placeholder="Buscar categoría o representante">
+                        </div>
+                    </div>
+                    <div class="admin-categories-body">
+                        <p class="admin-categories-empty">Cargando categorías…</p>
+                    </div>
+                </div>
+            `;
+            const openAdminCategories = () => {
+                adminCategoriesBackdrop.classList.add('active');
+                adminCategoriesModal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            };
+            const closeAdminCategories = () => {
+                adminCategoriesBackdrop.classList.remove('active');
+                adminCategoriesModal.classList.remove('active');
+                document.body.style.overflow = '';
+            };
+            adminCategoriesBackdrop.addEventListener('click', closeAdminCategories);
+            const adminCategoriesClose = adminCategoriesModal.querySelector('.admin-categories-close');
+            if (adminCategoriesClose) adminCategoriesClose.addEventListener('click', closeAdminCategories);
+            let adminCategoriesAbort = null;
+            let adminCategoriesData = [];
+            let adminCategoriesQuery = '';
+            const renderAdminCategories = () => {
+                const body = adminCategoriesModal.querySelector('.admin-categories-body');
+                if (!body) return;
+                const q = (adminCategoriesQuery || '').trim().toLowerCase();
+                const rows = (Array.isArray(adminCategoriesData) ? adminCategoriesData : [])
+                    .filter((r) => {
+                        if (!q) return true;
+                        const h = [
+                            String(r.nombre_categoria || ''),
+                            String(r.rep_nombre || ''),
+                        ].join(' ').toLowerCase();
+                        return h.includes(q);
+                    })
+                    .map((r) => {
+                        const id = String(r.id ?? '');
+                        const name = String(r.nombre_categoria ?? '');
+                        const rep = String(r.rep_nombre ?? '');
+                        return `
+                            <tr>
+                                <td>${name}</td>
+                                <td>${rep || '-'}</td>
+                                <td>
+                                    <button type="button" class="admin-cat-edit" data-id="${id}">Editar</button>
+                                    <span class="sep">|</span>
+                                    <button type="button" class="admin-cat-delete" data-id="${id}">Eliminar</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                body.innerHTML = `
+                    <table class="categories-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Rep</th>
+                                <th>Modify</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows || ''}
+                        </tbody>
+                    </table>
+                `;
+                if (!rows) {
+                    body.querySelector('tbody').innerHTML = '<tr><td colspan="3" class="admin-categories-empty">No hay categorías.</td></tr>';
+                }
+                body.addEventListener('click', (e) => {
+                    const delBtn = e.target.closest('.admin-cat-delete');
+                    const editBtn = e.target.closest('.admin-cat-edit');
+                    if (delBtn) {
+                        e.preventDefault();
+                        const id = delBtn.getAttribute('data-id');
+                        if (id) alert('Eliminar categoría ' + id + ' (pendiente de implementar)');
+                    } else if (editBtn) {
+                        e.preventDefault();
+                        const id = editBtn.getAttribute('data-id');
+                        if (id) alert('Editar categoría ' + id + ' (pendiente de implementar)');
+                    }
+                }, { once: true });
+            };
+            const fetchAdminCategories = async () => {
+                const body = adminCategoriesModal.querySelector('.admin-categories-body');
+                try { if (adminCategoriesAbort) adminCategoriesAbort.abort(); } catch (_){}
+                adminCategoriesAbort = new AbortController();
+                if (body) body.innerHTML = '<p class="admin-categories-empty">Cargando categorías…</p>';
+                const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
+                const url = (base ? base : '') + '/api/admin/categories';
+                try {
+                    const res = await fetch(url, { method: 'GET', signal: adminCategoriesAbort.signal });
+                    adminCategoriesAbort = null;
+                    if (!res.ok) {
+                        if (body) body.innerHTML = '<p class="admin-categories-empty">Error al cargar.</p>';
+                        return;
+                    }
+                    const data = await res.json();
+                    adminCategoriesData = Array.isArray(data) ? data : [];
+                    renderAdminCategories();
+                } catch (err) {
+                    adminCategoriesAbort = null;
+                    if (body) body.innerHTML = '<p class="admin-categories-empty">Error al cargar.</p>';
+                }
+            };
+            const adminCategoriesSearch = adminCategoriesModal.querySelector('.admin-categories-search');
+            if (adminCategoriesSearch) {
+                let t = null;
+                adminCategoriesSearch.addEventListener('input', () => {
+                    if (t) clearTimeout(t);
+                    t = setTimeout(() => {
+                        adminCategoriesQuery = adminCategoriesSearch.value || '';
+                        renderAdminCategories();
+                    }, 200);
+                });
+            }
+            let searchData = [];
+            let currentPage = 1;
+            const PAGE_SIZE = 10;
+            let searchAbortController = null;
+            const renderPage = (page) => {
+                const body = searchModal.querySelector('.search-results-body');
+                if (!body) return;
+                const fmtDate = (ds) => {
+                    const d = new Date(ds);
+                    if (isNaN(d.getTime())) return String(ds || '');
+                    const dd = d.getDate();
+                    const mm = d.getMonth() + 1;
+                    const yyyy = d.getFullYear();
+                    return `${dd}/${mm}/${yyyy}`;
+                };
+                const total = Array.isArray(searchData) ? searchData.length : 0;
+                const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                currentPage = Math.min(Math.max(1, page), totalPages);
+                const startIndex = (currentPage - 1) * PAGE_SIZE;
+                const endIndex = startIndex + PAGE_SIZE;
+                const pageRows = (Array.isArray(searchData) ? searchData : []).slice(startIndex, endIndex);
+                const rowsHtml = pageRows.map((row) => {
+                    const id = String(row.id ?? '');
+                    const descriptionFull = String(row.descripcion ?? '').trim();
+                    const descriptionShort = descriptionFull.length > 20 ? (descriptionFull.slice(0, 20) + '…') : descriptionFull;
+                    const userName = String(row.usuario ?? '');
+                    const assignedTo = String(row.assigned_to ?? '');
+                    const dateSubmitted = fmtDate(String(row.fecha_creacion ?? ''));
+                    const status = String(row.estado ?? '');
+                    const sl = status.toLowerCase();
+                    const sc = sl.includes('abierto') ? 'status-open'
+                        : sl.includes('pend') ? 'status-pending'
+                        : sl.includes('cerr') ? 'status-closed'
+                        : sl.includes('cancel') ? 'status-cancelled'
+                        : 'status-default';
+                    return `<tr>
+                        <td>${id}</td>
+                        <td title="${descriptionFull}">${descriptionShort}</td>
+                        <td>${userName}</td>
+                        <td>${assignedTo}</td>
+                        <td>${dateSubmitted}</td>
+                        <td><span class="status-badge ${sc}"><span class="status-dot"></span>${status}</span></td>
+                        <td><button type="button" class="result-view-btn" data-id="${id}">Ver</button></td>
+                    </tr>`;
+                }).join('');
+                const totalPages2 = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                const win = 5;
+                const startNum = Math.max(1, currentPage - win);
+                const endNum = Math.min(totalPages2, currentPage + win);
+                const pageNumbersHtml = Array.from({ length: endNum - startNum + 1 }, (_, i) => {
+                    const p = startNum + i;
+                    return `<button type="button" class="search-page-number${p === currentPage ? ' active' : ''}" data-page="${p}">${p}</button>`;
+                }).join('');
+                body.innerHTML = `
+                    <table class="search-results-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Descripción</th>
+                                <th>Usuario</th>
+                                <th>Asignado a</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                    <div class="search-results-pagination">
+                        <button type="button" class="search-page-prev"${currentPage <= 1 ? ' disabled' : ''}>Anterior</button>
+                        <div class="search-page-numbers">${pageNumbersHtml}</div>
+                        <div class="search-page-indicator">${currentPage} / ${totalPages2}</div>
+                        <button type="button" class="search-page-next"${currentPage >= totalPages ? ' disabled' : ''}>Siguiente</button>
+                    </div>
+                `;
+                const prev = body.querySelector('.search-page-prev');
+                const next = body.querySelector('.search-page-next');
+                if (prev) prev.onclick = () => { if (currentPage > 1) { currentPage -= 1; renderPage(currentPage); } };
+                if (next) next.onclick = () => { const totalPages3 = Math.max(1, Math.ceil(total / PAGE_SIZE)); if (currentPage < totalPages3) { currentPage += 1; renderPage(currentPage); } };
+                const numBtns = Array.from(body.querySelectorAll('.search-page-number'));
+                numBtns.forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        const p = parseInt(btn.getAttribute('data-page') || '1', 10);
+                        if (!isNaN(p)) {
+                            currentPage = p;
+                            renderPage(currentPage);
+                        }
+                    });
+                });
+            };
+            const resultsBody = searchModal.querySelector('.search-results-body');
+            if (resultsBody && !resultsBody.dataset.resultsHandler) {
+                resultsBody.addEventListener('click', (ev) => {
+                    const btn = ev.target.closest('.result-view-btn');
+                    if (btn && btn.dataset.id) {
+                        const id = btn.dataset.id;
+                        if (id) {
+                            onViewDetails(id);
+                        }
+                    }
+                });
+                resultsBody.dataset.resultsHandler = '1';
+            }
             const myRequestsModalBackdrop = document.createElement('div');
             myRequestsModalBackdrop.className = 'my-requests-modal-backdrop';
             const myRequestsModal = document.createElement('div');
@@ -387,6 +643,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="my-requests-tabs">
                                 <button type="button" class="my-requests-tab active" data-role="done">Hechas</button>
                                 <button type="button" class="my-requests-tab" data-role="received">Recibidas</button>
+                            </div>
+                            <div class="my-requests-search-wrapper">
+                                <input type="text" class="my-requests-search" placeholder="Buscar por descripción, asignado o creador">
                             </div>
                             <div class="my-requests-filter-wrapper">
                                 <button type="button" class="my-requests-filter" title="Filtros">
@@ -574,8 +833,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ordEl) ordEl.checked = true;
                 if (typeof loadSearchDropdowns === 'function') {
                     const p = loadSearchDropdowns();
-                    if (p && typeof p.then === 'function') { p.then(() => {}); } else { }
-                } else { }
+                    if (p && typeof p.then === 'function') { p.then(() => {}); }
+                }
             };
             const closeSearchModal = () => {
                 searchModalBackdrop.classList.remove('active');
@@ -643,7 +902,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     closeSearchModal();
                 });
             }
+            const searchReportedByInput = searchModal.querySelector('#search-reported-by');
             const searchCategorySelect = searchModal.querySelector('#search-category');
+            window.searchCategorySelect = searchCategorySelect;
             const searchDepartmentSelect = searchModal.querySelector('#search-department');
             const searchStatusSelect = searchModal.querySelector('#search-status');
             const searchPrioritySelect = searchModal.querySelector('#search-priority');
@@ -666,14 +927,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 try { selectEl.style.display = 'none'; } catch {}
                 const render = (q) => {
                     const query = (q || '').toLowerCase();
-                    const arr = Array.isArray(items) ? items : [];
+                    const arr = Array.from(selectEl.options || []).map((o) => {
+                        const val = String(o.value || '');
+                        const txt = String(o.textContent || '');
+                        return { [idKey]: val, [nameKey]: txt };
+                    }).filter((it) => String(it[idKey] ?? '') !== '');
                     const filtered = arr.filter((it) => {
                         const nm = String(it[nameKey] ?? '').toLowerCase();
                         return query === '' ? true : nm.includes(query);
                     }).slice(0, 50);
-                    const anyItem = { [idKey]: '', [nameKey]: 'Cualquiera' };
-                    const final = query === '' ? [anyItem].concat(filtered) : filtered;
-                    list.innerHTML = final.map((it) => {
+                    list.innerHTML = filtered.map((it) => {
                         const id = String(it[idKey] ?? '');
                         const nm = String(it[nameKey] ?? '');
                         return `<div class="searchable-item" data-id="${id}">${nm}</div>`;
@@ -704,8 +967,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const applyCurrent = () => {
                     const cur = selectEl.value;
                     if (!cur) { input.value = ''; return; }
-                    const hit = (Array.isArray(items) ? items : []).find((it) => String(it[idKey] ?? '') === String(cur));
-                    input.value = hit ? String(hit[nameKey] ?? '') : '';
+                    const opt = Array.from(selectEl.options || []).find((o) => String(o.value || '') === String(cur));
+                    input.value = opt ? String(opt.textContent || '') : '';
                 };
                 applyCurrent();
                 selectEl.addEventListener('change', applyCurrent);
@@ -727,36 +990,109 @@ document.addEventListener('DOMContentLoaded', () => {
                 wrapper.appendChild(list);
                 field.insertBefore(wrapper, selectEl);
                 try { selectEl.style.display = 'none'; } catch {}
-                let ac = null;
                 let timer = null;
+                let seq = 0;
+                const cache = Object.create(null);
+                let currentIndex = -1;
+                let loading = false;
                 const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
                 const renderItems = (items) => {
-                    const anyItem = { id_usuario: '', nombre_usuario: 'Cualquiera' };
-                    const final = (input.value.trim() === '' ? [anyItem] : []).concat((Array.isArray(items) ? items : []).slice(0, 50));
-                    list.innerHTML = final.map((it) => {
+                    const q = input.value.trim();
+                    const baseItems = (Array.isArray(items) ? items : []).slice(0, 50);
+                    const rows = [];
+                    if (loading) rows.push({ id_usuario: '', nombre_usuario: 'Buscando...' , disabled: true });
+                    if (q.length < 2 && !loading) rows.push({ id_usuario: '', nombre_usuario: 'Escribe 2+ letras para buscar', disabled: true });
+                    rows.push.apply(rows, baseItems);
+                    list.innerHTML = rows.map((it, idx) => {
                         const id = String(it.id_usuario ?? '');
                         const nm = String(it.nombre_usuario ?? '');
-                        return `<div class="searchable-item" data-id="${id}">${nm}</div>`;
+                        const dis = it.disabled ? ' data-disabled="1"' : '';
+                        const act = (idx === currentIndex) ? ' searchable-item active' : ' searchable-item';
+                        return `<div class="${act}" data-id="${id}"${dis}>${nm}</div>`;
                     }).join('');
                 };
                 const fetchUsers = async (q) => {
-                    if (ac) try { ac.abort(); } catch {}
-                    ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
-                    const url = (base ? base : '') + '/api/catalog/users' + (q ? ('?q=' + encodeURIComponent(q)) : '');
+                    const query = (q || '').trim();
+                    const catId = (window.searchCategorySelect && window.searchCategorySelect.value) ? String(window.searchCategorySelect.value) : '';
+                    if (query.length < 2 && !catId) { renderItems([]); list.style.display = 'block'; return; }
+                    const qs = [];
+                    if (catId) qs.push('category_id=' + encodeURIComponent(catId));
+                    qs.push('q=' + encodeURIComponent(query));
+                    const url = (base ? base : '') + '/api/catalog/users?' + qs.join('&');
+                    const reqId = ++seq;
+                    const ck = query + '|' + catId;
+                    if (cache[ck]) {
+                        renderItems(cache[ck]);
+                        list.style.display = 'block';
+                        return;
+                    }
                     try {
-                        const res = await fetch(url, ac ? { signal: ac.signal } : {});
+                        loading = true;
+                        renderItems([]);
+                        const res = await fetch(url, {});
                         const data = res.ok ? await res.json() : [];
+                        cache[ck] = data;
+                        loading = false;
+                        if (reqId !== seq) return;
                         renderItems(data);
                         list.style.display = 'block';
-                    } catch (_) {}
+                    } catch (_) {
+                        loading = false;
+                        renderItems([]);
+                    }
                 };
                 input.addEventListener('focus', () => {
-                    fetchUsers('');
+                    currentIndex = -1;
+                    const q = input.value.trim();
+                    const catId = (window.searchCategorySelect && window.searchCategorySelect.value) ? String(window.searchCategorySelect.value) : '';
+                    if (q.length < 2 && catId) {
+                        fetchUsers('');
+                    } else {
+                        renderItems([]);
+                        list.style.display = 'block';
+                    }
                 });
                 input.addEventListener('input', () => {
                     if (timer) clearTimeout(timer);
                     const q = input.value.trim();
-                    timer = setTimeout(() => fetchUsers(q), 250);
+                    timer = setTimeout(() => fetchUsers(q), 300);
+                });
+                if (window.searchCategorySelect) {
+                    window.searchCategorySelect.addEventListener('change', () => {
+                        const q = input.value.trim();
+                        if (q.length < 2) {
+                            fetchUsers('');
+                        } else {
+                            fetchUsers(q);
+                        }
+                    });
+                }
+                input.addEventListener('keydown', (e) => {
+                    const items = Array.from(list.querySelectorAll('.searchable-item')).filter((el) => el.getAttribute('data-disabled') !== '1');
+                    const max = items.length - 1;
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        currentIndex = Math.min(currentIndex + 1, max);
+                        if (currentIndex < 0 && max >= 0) currentIndex = 0;
+                        renderItems(items.map((el) => ({ id_usuario: el.getAttribute('data-id') || '', nombre_usuario: el.textContent || '' })));
+                        list.style.display = 'block';
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        currentIndex = Math.max(currentIndex - 1, 0);
+                        renderItems(items.map((el) => ({ id_usuario: el.getAttribute('data-id') || '', nombre_usuario: el.textContent || '' })));
+                        list.style.display = 'block';
+                    } else if (e.key === 'Enter') {
+                        if (currentIndex >= 0 && items[currentIndex]) {
+                            const el = items[currentIndex];
+                            const id = el.getAttribute('data-id') || '';
+                            const nm = el.textContent || '';
+                            selectEl.value = id;
+                            input.value = id ? nm : '';
+                            list.style.display = 'none';
+                        }
+                    } else if (e.key === 'Escape') {
+                        list.style.display = 'none';
+                    }
                 });
                 document.addEventListener('click', (e) => {
                     if (!wrapper.contains(e.target)) {
@@ -766,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 list.addEventListener('click', (e) => {
                     const item = e.target.closest('.searchable-item');
                     if (!item) return;
+                    if (item.getAttribute('data-disabled') === '1') return;
                     const id = item.getAttribute('data-id') || '';
                     selectEl.value = id;
                     const nm = item.textContent || '';
@@ -773,6 +1110,120 @@ document.addEventListener('DOMContentLoaded', () => {
                     list.style.display = 'none';
                 });
                 selectEl.dataset.searchableInitialized = '1';
+            };
+            const initSearchableInputRemoteUsers = (inputEl) => {
+                if (!inputEl || inputEl.dataset.searchableInitialized === '1') return;
+                const field = inputEl.closest('.field') || inputEl.parentElement;
+                if (!field) return;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'searchable-select';
+                inputEl.parentElement.insertBefore(wrapper, inputEl);
+                wrapper.appendChild(inputEl);
+                const list = document.createElement('div');
+                list.className = 'searchable-list';
+                wrapper.appendChild(list);
+                let timer = null;
+                let seq = 0;
+                const cache = Object.create(null);
+                let currentIndex = -1;
+                let loading = false;
+                inputEl.placeholder = inputEl.placeholder || 'Escribe para buscar...';
+                const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
+                const renderItems = (items) => {
+                    const q = inputEl.value.trim();
+                    const baseItems = (Array.isArray(items) ? items : []).slice(0, 50);
+                    const rows = [];
+                    if (loading) rows.push({ id_usuario: '', nombre_usuario: 'Buscando...' , disabled: true });
+                    if (q.length < 2 && !loading) rows.push({ id_usuario: '', nombre_usuario: 'Escribe 2+ letras para buscar', disabled: true });
+                    rows.push.apply(rows, baseItems);
+                    list.innerHTML = rows.map((it, idx) => {
+                        const id = String(it.id_usuario ?? '');
+                        const nm = String(it.nombre_usuario ?? '');
+                        const dis = it.disabled ? ' data-disabled="1"' : '';
+                        const act = (idx === currentIndex) ? ' searchable-item active' : ' searchable-item';
+                        return `<div class="${act}" data-id="${id}"${dis}>${nm}</div>`;
+                    }).join('');
+                };
+                const fetchUsers = async (q) => {
+                    const query = (q || '').trim();
+                    if (query.length < 2) { renderItems([]); list.style.display = 'block'; return; }
+                    const url = (base ? base : '') + '/api/catalog/users?q=' + encodeURIComponent(query);
+                    const reqId = ++seq;
+                    if (cache[query]) {
+                        renderItems(cache[query]);
+                        list.style.display = 'block';
+                        return;
+                    }
+                    try {
+                        loading = true;
+                        renderItems([]);
+                        const res = await fetch(url, {});
+                        const data = res.ok ? await res.json() : [];
+                        cache[query] = data;
+                        loading = false;
+                        if (reqId !== seq) return;
+                        renderItems(data);
+                        list.style.display = 'block';
+                    } catch (_) {
+                        loading = false;
+                        renderItems([]);
+                    }
+                };
+                inputEl.addEventListener('focus', () => {
+                    currentIndex = -1;
+                    renderItems([]);
+                    list.style.display = 'block';
+                });
+                inputEl.addEventListener('input', () => {
+                    if (timer) clearTimeout(timer);
+                    const q = inputEl.value.trim();
+                    timer = setTimeout(() => fetchUsers(q), 300);
+                });
+                inputEl.addEventListener('keydown', (e) => {
+                    const items = Array.from(list.querySelectorAll('.searchable-item')).filter((el) => el.getAttribute('data-disabled') !== '1');
+                    const max = items.length - 1;
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        currentIndex = Math.min(currentIndex + 1, max);
+                        if (currentIndex < 0 && max >= 0) currentIndex = 0;
+                        renderItems(items.map((el) => ({ id_usuario: el.getAttribute('data-id') || '', nombre_usuario: el.textContent || '' })));
+                        list.style.display = 'block';
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        currentIndex = Math.max(currentIndex - 1, 0);
+                        renderItems(items.map((el) => ({ id_usuario: el.getAttribute('data-id') || '', nombre_usuario: el.textContent || '' })));
+                        list.style.display = 'block';
+                    } else if (e.key === 'Enter') {
+                        if (currentIndex >= 0 && items[currentIndex]) {
+                            const el = items[currentIndex];
+                            const id = el.getAttribute('data-id') || '';
+                            const nm = el.textContent || '';
+                            inputEl.dataset.userId = id;
+                            inputEl.value = id ? nm : '';
+                            list.style.display = 'none';
+                        }
+                    } else if (e.key === 'Escape') {
+                        list.style.display = 'none';
+                    } else {
+                        inputEl.dataset.userId = '';
+                    }
+                });
+                document.addEventListener('click', (e) => {
+                    if (!wrapper.contains(e.target)) {
+                        list.style.display = 'none';
+                    }
+                });
+                list.addEventListener('click', (e) => {
+                    const item = e.target.closest('.searchable-item');
+                    if (!item) return;
+                    if (item.getAttribute('data-disabled') === '1') return;
+                    const id = item.getAttribute('data-id') || '';
+                    inputEl.dataset.userId = id;
+                    const nm = item.textContent || '';
+                    inputEl.value = id ? nm : '';
+                    list.style.display = 'none';
+                });
+                inputEl.dataset.searchableInitialized = '1';
             };
             const loadSearchDropdowns = async () => {
                 const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
@@ -797,6 +1248,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 prime(searchStatusSelect);
                 prime(searchPrioritySelect);
                 prime(searchAssignedToSelect);
+                initSearchableSelect(searchCategorySelect, [], 'id_categoria', 'nombre_categoria');
+                initSearchableSelect(searchDepartmentSelect, [], 'id_departamento', 'nombre_departamento');
+                initSearchableSelectRemoteUsers(searchAssignedToSelect);
                 const cacheKey = 'HelpdeskCatalogsV1';
                 const ttl = 5 * 60 * 1000;
                 const now = Date.now();
@@ -808,36 +1262,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     setOptions(searchDepartmentSelect, cached.deps || [], 'id_departamento', 'nombre_departamento', 'Cualquiera');
                     setOptions(searchStatusSelect, cached.sts || [], 'id_estado', 'nombre_estado', 'Cualquiera');
                     setOptions(searchPrioritySelect, cached.pri || [], 'id_prioridad', 'nombre_prioridad', 'Cualquiera');
-                    setOptions(searchAssignedToSelect, cached.usr || [], 'id_usuario', 'nombre_usuario', 'Cualquiera');
                     initSearchableSelect(searchCategorySelect, cached.cats || [], 'id_categoria', 'nombre_categoria');
-                    initSearchableSelect(searchAssignedToSelect, cached.usr || [], 'id_usuario', 'nombre_usuario');
                     initSearchableSelect(searchDepartmentSelect, cached.deps || [], 'id_departamento', 'nombre_departamento');
                 }
                 const fetchAndUpdate = async () => {
                     const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
                     const t = setTimeout(() => { if (ac) ac.abort(); }, 10000);
                     try {
-                        const [catsRes, depsRes, stsRes, priRes, usrRes] = await Promise.all([
+                        const [catsRes, depsRes, stsRes, priRes] = await Promise.all([
                             fetch((base ? base : '') + '/api/catalog/categories', ac ? { signal: ac.signal } : {}),
                             fetch((base ? base : '') + '/api/catalog/departments', ac ? { signal: ac.signal } : {}),
                             fetch((base ? base : '') + '/api/catalog/statuses', ac ? { signal: ac.signal } : {}),
                             fetch((base ? base : '') + '/api/catalog/priorities', ac ? { signal: ac.signal } : {}),
-                            fetch((base ? base : '') + '/api/catalog/users', ac ? { signal: ac.signal } : {}),
                         ]);
                         const cats = catsRes.ok ? await catsRes.json() : [];
                         const deps = depsRes.ok ? await depsRes.json() : [];
                         const sts = stsRes.ok ? await stsRes.json() : [];
                         const pri = priRes.ok ? await priRes.json() : [];
-                        const usr = usrRes.ok ? await usrRes.json() : [];
                         setOptions(searchCategorySelect, cats, 'id_categoria', 'nombre_categoria', 'Cualquiera');
                         setOptions(searchDepartmentSelect, deps, 'id_departamento', 'nombre_departamento', 'Cualquiera');
                         setOptions(searchStatusSelect, sts, 'id_estado', 'nombre_estado', 'Cualquiera');
                         setOptions(searchPrioritySelect, pri, 'id_prioridad', 'nombre_prioridad', 'Cualquiera');
-                        setOptions(searchAssignedToSelect, usr, 'id_usuario', 'nombre_usuario', 'Cualquiera');
                         initSearchableSelect(searchCategorySelect, cats, 'id_categoria', 'nombre_categoria');
-                        initSearchableSelect(searchAssignedToSelect, usr, 'id_usuario', 'nombre_usuario');
                         initSearchableSelect(searchDepartmentSelect, deps, 'id_departamento', 'nombre_departamento');
-                        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), cats, deps, sts, pri, usr })); } catch {}
+                        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), cats, deps, sts, pri })); } catch {}
                     } catch (_) {} finally { clearTimeout(t); }
                 };
                 if (!fresh) {
@@ -846,6 +1294,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     fetchAndUpdate();
                 }
             };
+            if (searchReportedByInput) initSearchableInputRemoteUsers(searchReportedByInput);
+            if (searchAssignedToSelect) initSearchableSelectRemoteUsers(searchAssignedToSelect);
             const restoreSearchFormState = () => {
                 const raw = localStorage.getItem('HelpdeskSearchState');
                 if (!raw) return;
@@ -890,18 +1340,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                         const rowsHtml = results.map((row) => {
                             const id = String(row.id ?? '');
-                            const title = String(row.descripcion ?? '').trim();
+                            const descriptionFull = String(row.descripcion ?? '').trim();
+                            const descriptionShort = descriptionFull.length > 20 ? (descriptionFull.slice(0, 20) + '…') : descriptionFull;
                             const userName = String(row.usuario ?? '');
-                            const assignedTo = String(row.area ?? '');
+                            const assignedTo = String(row.assigned_to ?? '');
                             const dateSubmitted = fmtDate(String(row.fecha_creacion ?? ''));
                             const status = String(row.estado ?? '');
+                            const sl = status.toLowerCase();
+                            const sc = sl.includes('abierto') ? 'status-open'
+                                : sl.includes('pend') ? 'status-pending'
+                                : sl.includes('cerr') ? 'status-closed'
+                                : sl.includes('cancel') ? 'status-cancelled'
+                                : 'status-default';
                             return `<tr>
                                 <td>${id}</td>
-                                <td>${title}</td>
+                                <td title="${descriptionFull}">${descriptionShort}</td>
                                 <td>${userName}</td>
                                 <td>${assignedTo}</td>
                                 <td>${dateSubmitted}</td>
-                                <td>${status}</td>
+                                <td><span class="status-badge ${sc}"><span class="status-dot"></span>${status}</span></td>
                                 <td><button type=\"button\" class=\"result-view-btn\" data-id=\"${id}\">Ver</button></td>
                             </tr>`;
                         }).join('');
@@ -911,7 +1368,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <thead>
                                         <tr>
                                             <th>ID</th>
-                                            <th>Título</th>
+                                            <th>Descripción</th>
                                             <th>Usuario</th>
                                             <th>Asignado a</th>
                                             <th>Fecha</th>
@@ -935,6 +1392,115 @@ document.addEventListener('DOMContentLoaded', () => {
                     closeMyRequestsModal();
                 });
             }
+            let myRequestsAbort = null;
+            let myRequestsRole = 'done';
+            let myRequestsFilter = 'all';
+            let myRequestsQuery = '';
+            let myRequestsData = [];
+            const renderMyRequests = () => {
+                const body = myRequestsModal.querySelector('.my-requests-body');
+                if (!body) return;
+                if (!Array.isArray(myRequestsData) || myRequestsData.length === 0) {
+                    body.innerHTML = '<p class="my-requests-empty">No hay solicitudes.</p>';
+                    return;
+                }
+                const fmtDate = (ds) => {
+                    const d = new Date(ds);
+                    if (isNaN(d.getTime())) return String(ds || '');
+                    const dd = d.getDate();
+                    const mm = d.getMonth() + 1;
+                    const yyyy = d.getFullYear();
+                    return `${dd}/${mm}/${yyyy}`;
+                };
+                const isClosed = (st) => {
+                    const s = String(st || '').toLowerCase();
+                    return s.includes('cerrado') || s.includes('cancelado');
+                };
+                const q = String(myRequestsQuery || '').trim().toLowerCase();
+                const filtered = myRequestsData.filter((r) => {
+                    if (myRequestsFilter === 'pending') return !isClosed(r.estado);
+                    if (myRequestsFilter === 'closed') return isClosed(r.estado);
+                    return true;
+                }).filter((r) => {
+                    if (!q) return true;
+                    const haystack = [
+                        String(r.descripcion || ''),
+                        String(r.assigned_to || ''),
+                        String(r.usuario || ''),
+                    ].join(' ').toLowerCase();
+                    return haystack.includes(q);
+                });
+                const rows = filtered.map((row) => {
+                    const id = String(row.id ?? '');
+                    const descriptionFull = String(row.descripcion ?? '').trim();
+                    const descriptionShort = descriptionFull.length > 20 ? (descriptionFull.slice(0, 20) + '…') : descriptionFull;
+                    const userName = String(row.usuario ?? '');
+                    const assignedTo = String(row.assigned_to ?? '');
+                    const dateSubmitted = fmtDate(String(row.fecha_creacion ?? ''));
+                    const status = String(row.estado ?? '');
+                    const sl = status.toLowerCase();
+                    const sc = sl.includes('abierto') ? 'status-open'
+                        : sl.includes('pend') ? 'status-pending'
+                        : sl.includes('cerr') ? 'status-closed'
+                        : sl.includes('cancel') ? 'status-cancelled'
+                        : 'status-default';
+                    return `<tr>
+                        <td>${id}</td>
+                        <td title="${descriptionFull}">${descriptionShort}</td>
+                        <td>${userName}</td>
+                        <td>${assignedTo}</td>
+                        <td>${dateSubmitted}</td>
+                        <td><span class="status-badge ${sc}"><span class="status-dot"></span>${status}</span></td>
+                        <td><button type="button" class="result-view-btn" data-id="${id}">Ver</button></td>
+                    </tr>`;
+                }).join('');
+                body.innerHTML = `
+                    <table class="search-results-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Descripción</th>
+                                <th>Usuario</th>
+                                <th>Asignado a</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            };
+            const fetchMyRequests = async (role) => {
+                const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
+                const url = (base ? base : '') + '/api/tickets/search';
+                const body = myRequestsModal.querySelector('.my-requests-body');
+                try { if (myRequestsAbort) myRequestsAbort.abort(); } catch (_){}
+                myRequestsAbort = new AbortController();
+                myRequestsRole = role || myRequestsRole;
+                myRequestsData = [];
+                if (body) body.innerHTML = '<p class="search-results-loading">Cargando…</p>';
+                const params = new URLSearchParams();
+                if (myRequestsRole === 'done') {
+                    params.append('reported_by', 'me');
+                } else {
+                    params.append('assigned_to', 'me');
+                }
+                try {
+                    const res = await fetch(url + '?' + params.toString(), { method: 'GET', signal: myRequestsAbort.signal });
+                    myRequestsAbort = null;
+                    if (!res.ok) {
+                        if (body) body.innerHTML = '<p class="search-results-empty">No se pudieron cargar tus solicitudes.</p>';
+                        return;
+                    }
+                    const data = await res.json();
+                    myRequestsData = Array.isArray(data) ? data : [];
+                    renderMyRequests();
+                } catch (err) {
+                    myRequestsAbort = null;
+                    if (body) body.innerHTML = '<p class="search-results-empty">Ocurrió un error al cargar.</p>';
+                }
+            };
             const requestForm = requestModal.querySelector('.request-form');
             const processSelect = requestModal.querySelector('#request-process');
             const categorySelect = requestModal.querySelector('#request-category');
@@ -946,6 +1512,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const processRequiredMsg = requestModal.querySelector('.process-required-msg');
             let requestSubmitLock = false;
             let requestSubmitLastTs = 0;
+            let editingTicketId = null;
             const populateProcesses = async () => {
                 try {
                     const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
@@ -1038,6 +1605,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
             const resetRequestForm = () => {
+                const hdr = requestModal.querySelector('.request-modal-header h3');
+                if (hdr) hdr.textContent = 'Nueva solicitud';
+                if (requestSubmit) requestSubmit.textContent = 'Enviar petición';
+                editingTicketId = null;
                 if (processSelect) processSelect.value = '';
                 if (categorySelect) categorySelect.innerHTML = '<option value="">Selecciona una categoría</option>';
                 if (descriptionInput) descriptionInput.value = '';
@@ -1063,6 +1634,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 updateFormEnabled();
             };
+            const beginEditTicket = async (ticket) => {};
             if (requestForm && categorySelect && descriptionInput) {
                 requestForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
@@ -1105,21 +1677,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                         const res = await fetch(url, { method: 'POST', body: fd });
                         if (!res.ok) {
-                            if (window.Alertas && typeof window.Alertas.showError === 'function') {
-                                window.Alertas.showError('No se pudo crear el ticket.');
-                            } else {
-                                alert('No se pudo crear el ticket.');
-                            }
+                            if (window.Alertas && typeof window.Alertas.showError === 'function') { window.Alertas.showError('No se pudo crear el ticket.'); } else { alert('No se pudo crear el ticket.'); }
                             requestSubmitLock = false;
                             if (requestSubmit) requestSubmit.disabled = false;
                             return;
                         }
                         await res.json();
-                        if (window.Alertas && typeof window.Alertas.showSuccess === 'function') {
-                            window.Alertas.showSuccess('El ticket se generó correctamente.');
-                        } else {
-                            alert('El ticket se generó correctamente.');
-                        }
+                        if (window.Alertas && typeof window.Alertas.showSuccess === 'function') { window.Alertas.showSuccess('El ticket se generó correctamente.'); } else { alert('El ticket se generó correctamente.'); }
                         resetRequestForm();
                         closeRequestModal();
                     } catch (_) {}
@@ -1137,8 +1701,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     e.preventDefault();
                     const base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
                     const url = (base ? base : '') + '/api/tickets/search';
+                    const body = searchModal.querySelector('.search-results-body');
+                    // cancelar búsqueda anterior si sigue en curso y limpiar residuos
+                    try { if (searchAbortController) searchAbortController.abort(); } catch (_){}
+                    searchData = [];
+                    currentPage = 1;
+                    if (body) body.innerHTML = '<p class="search-results-loading">Buscando…</p>';
                     const rp = (v) => (v === undefined || v === null) ? '' : String(v).trim();
-                    const reportedBy = rp(searchForm.querySelector('#search-reported-by')?.value);
+                    const reportedEl = searchForm.querySelector('#search-reported-by');
+                    const reportedBy = rp(reportedEl?.value);
+                    const reportedById = rp(reportedEl?.dataset?.userId || '');
                     const problemId = rp(searchForm.querySelector('#search-problem-id')?.value);
                     const assignedTo = rp(searchForm.querySelector('#search-assigned-to')?.value);
                     const categoryId = rp(searchForm.querySelector('#search-category')?.value);
@@ -1150,7 +1722,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const dateTo = rp(searchForm.querySelector('#search-date-to')?.value);
                     const orderBy = rp(searchForm.querySelector('input[name="order_by"]:checked')?.value || 'id');
                     const params = new URLSearchParams();
-                    if (reportedBy) params.append('reported_by', reportedBy);
+                    if (reportedById) {
+                        params.append('reported_by_id', reportedById);
+                    } else if (reportedBy) {
+                        params.append('reported_by', reportedBy);
+                    }
                     if (problemId) params.append('problem_id', problemId);
                     if (assignedTo) params.append('assigned_to', assignedTo);
                     if (categoryId) params.append('category_id', categoryId);
@@ -1162,12 +1738,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (dateTo) params.append('date_to', dateTo);
                     if (orderBy) params.append('order_by', orderBy);
                     try {
-                        const res = await fetch(url + '?' + params.toString(), { method: 'GET' });
-                        const body = searchModal.querySelector('.search-results-body');
+                        const ctrl = new AbortController();
+                        searchAbortController = ctrl;
+                        const res = await fetch(url + '?' + params.toString(), { method: 'GET', signal: ctrl.signal });
+                        searchAbortController = null;
                         if (!res.ok) {
                             if (body) {
                                 body.innerHTML = '<p class="search-results-empty">No se pudo buscar.</p>';
                             }
+                            searchData = [];
                             return;
                         }
                         const data = await res.json();
@@ -1182,42 +1761,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             };
                             if (!Array.isArray(data) || data.length === 0) {
                                 body.innerHTML = '<p class="search-results-empty">Sin resultados.</p>';
+                                searchData = [];
                             } else {
-                                const rowsHtml = data.map((row) => {
-                                    const id = String(row.id ?? '');
-                                    const title = String(row.descripcion ?? '').trim();
-                                    const userName = String(row.usuario ?? '');
-                                    const assignedTo = String(row.area ?? '');
-                                    const dateSubmitted = fmtDate(String(row.fecha_creacion ?? ''));
-                                    const status = String(row.estado ?? '');
-                                    return `<tr>
-                                        <td>${id}</td>
-                                        <td>${title}</td>
-                                        <td>${userName}</td>
-                                        <td>${assignedTo}</td>
-                                        <td>${dateSubmitted}</td>
-                                        <td>${status}</td>
-                                        <td><button type="button" class="result-view-btn" data-id="${id}">Ver</button></td>
-                                    </tr>`;
-                                }).join('');
-                                body.innerHTML = `
-                                    <table class="search-results-table">
-                                        <thead>
-                                            <tr>
-                                                <th>ID</th>
-                                                <th>Título</th>
-                                                <th>Usuario</th>
-                                                <th>Asignado a</th>
-                                                <th>Fecha</th>
-                                                <th>Estado</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${rowsHtml}
-                                        </tbody>
-                                    </table>
-                                `;
+                                searchData = data;
+                                currentPage = 1;
+                                renderPage(currentPage);
                             }
                         }
                         searchResults.classList.add('active');
@@ -1226,6 +1774,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (body) {
                             body.innerHTML = '<p class="search-results-empty">Ocurrió un error al buscar.</p>';
                         }
+                        searchData = [];
+                        searchAbortController = null;
                         searchResults.classList.add('active');
                     }
                 });
@@ -1251,6 +1801,19 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             document.body.appendChild(ticketDetailsBackdrop);
             document.body.appendChild(ticketDetailsModal);
+            try {
+                const eb = ticketDetailsModal.querySelector('.ticket-details-edit');
+                if (eb) eb.remove();
+            } catch (_) {}
+            try {
+                const rm = () => {
+                    const xs = ticketDetailsModal.querySelectorAll('.ticket-details-edit');
+                    if (xs && xs.length) xs.forEach((n) => { try { n.remove(); } catch (_) {} });
+                };
+                rm();
+                const mo = (typeof MutationObserver !== 'undefined') ? new MutationObserver(rm) : null;
+                if (mo) mo.observe(ticketDetailsModal, { childList: true, subtree: true });
+            } catch (_) {}
             const openTicketDetails = () => {
                 ticketDetailsBackdrop.classList.add('active');
                 ticketDetailsModal.classList.add('active');
@@ -1288,10 +1851,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (body) {
                         body.innerHTML = `
                             <div class="ticket-detail-row"><div class="ticket-detail-label">ID</div><div class="ticket-detail-value">#${String(row.id ?? '')}</div></div>
-                            <div class="ticket-detail-row"><div class="ticket-detail-label">Título</div><div class="ticket-detail-value">${String(row.descripcion ?? '')}</div></div>
+                            <div class="ticket-detail-row"><div class="ticket-detail-label">Descripción</div><div class="ticket-detail-value">${String(row.descripcion ?? '')}</div></div>
                             <div class="ticket-detail-row"><div class="ticket-detail-label">Usuario</div><div class="ticket-detail-value">${String(row.usuario ?? '')}</div></div>
                             <div class="ticket-detail-row"><div class="ticket-detail-label">Correo</div><div class="ticket-detail-value">${String(row.correo ?? '')}</div></div>
-                            <div class="ticket-detail-row"><div class="ticket-detail-label">Área</div><div class="ticket-detail-value">${String(row.area ?? '')}</div></div>
+                            <div class="ticket-detail-row"><div class="ticket-detail-label">Asignado a</div><div class="ticket-detail-value">${String(row.assigned_to ?? '')}</div></div>
+                            <div class="ticket-detail-row"><div class="ticket-detail-label">Proceso</div><div class="ticket-detail-value">${String(row.proceso ?? '')}</div></div>
                             <div class="ticket-detail-row"><div class="ticket-detail-label">Departamento</div><div class="ticket-detail-value">${String(row.departamento ?? '')}</div></div>
                             <div class="ticket-detail-row"><div class="ticket-detail-label">Categoría</div><div class="ticket-detail-value">${String(row.categoria ?? '')}</div></div>
                             <div class="ticket-detail-row"><div class="ticket-detail-label">Prioridad</div><div class="ticket-detail-value">${String(row.prioridad ?? '')}</div></div>
@@ -1305,7 +1869,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         const type = String(a.type ?? '');
                                         const url = String(a.url ?? '');
                                         const icon = type.startsWith('image/') ? '🖼' : (type.includes('pdf') ? '📄' : '📎');
-                                        return `<div class="ticket-attachment-item">
+                                        return `<div class="ticket-attachment-item" data-url="${url}" data-type="${type}" data-name="${name}">
                                             <div class="ticket-attachment-icon">${icon}</div>
                                             <div class="ticket-attachment-name" title="${name}">${name}</div>
                                             <div class="ticket-attachment-actions"><a href="${url}" target="_blank" rel="noopener">Descargar</a></div>
@@ -1316,6 +1880,60 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                     }
                     openTicketDetails();
+                    
+                    if (!ticketDetailsModal.dataset.attachmentsHandler) {
+                        const openRemoteImagePreview = (url, name) => {
+                            const overlay = document.createElement('div');
+                            overlay.className = 'image-lightbox';
+                            overlay.innerHTML = `
+                                <div class="image-lightbox-inner">
+                                    <button type="button" class="image-lightbox-close">&times;</button>
+                                    <img src="${url}" alt="${name}">
+                                    <div class="image-lightbox-caption">${name}</div>
+                                </div>
+                            `;
+                            const close = () => {
+                                if (overlay.parentNode) {
+                                    overlay.parentNode.removeChild(overlay);
+                                }
+                            };
+                            overlay.addEventListener('click', (e) => {
+                                if (e.target === overlay) {
+                                    close();
+                                }
+                            });
+                            const closeBtn = overlay.querySelector('.image-lightbox-close');
+                            if (closeBtn) {
+                                closeBtn.addEventListener('click', (e) => {
+                                    e.preventDefault();
+                                    close();
+                                });
+                            }
+                            document.body.appendChild(overlay);
+                        };
+                        ticketDetailsModal.addEventListener('click', (e) => {
+                            const item = e.target && e.target.closest ? e.target.closest('.ticket-attachment-item') : null;
+                            if (!item) return;
+                            e.preventDefault();
+                            const url = item.getAttribute('data-url') || '';
+                            const type = item.getAttribute('data-type') || '';
+                            const name = item.getAttribute('data-name') || '';
+                            const ext = (name.split('.').pop() || '').toLowerCase();
+                            const isImg = (type.startsWith('image/')) || ['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext);
+                            if (isImg) {
+                                openRemoteImagePreview(url, name);
+                            } else {
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = name || '';
+                                a.rel = 'noopener';
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                            }
+                        });
+                        ticketDetailsModal.dataset.attachmentsHandler = '1';
+                    }
                 } catch (_) {}
             };
             searchModal.addEventListener('click', (e) => {
@@ -1333,12 +1951,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     tab.addEventListener('click', () => {
                         myRequestsTabs.forEach((t) => t.classList.remove('active'));
                         tab.classList.add('active');
+                        const role = tab.getAttribute('data-role') || 'done';
+                        fetchMyRequests(role);
                     });
                 });
+                fetchMyRequests('done');
             }
             const myRequestsFilterToggle = myRequestsModal.querySelector('.my-requests-filter');
             const myRequestsFilterBar = myRequestsModal.querySelector('.my-requests-filter-bar');
             const myRequestsFilterOptions = myRequestsModal.querySelectorAll('.my-requests-filter-option');
+            const myRequestsSearchInput = myRequestsModal.querySelector('.my-requests-search');
             if (myRequestsFilterToggle && myRequestsFilterBar) {
                 myRequestsFilterToggle.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -1350,7 +1972,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     opt.addEventListener('click', () => {
                         myRequestsFilterOptions.forEach((o) => o.classList.remove('active'));
                         opt.classList.add('active');
+                        myRequestsFilter = opt.getAttribute('data-status') || 'all';
+                        renderMyRequests();
                     });
+                });
+            }
+            if (myRequestsSearchInput) {
+                let qTimer = null;
+                const applyQ = () => {
+                    myRequestsQuery = myRequestsSearchInput.value || '';
+                    renderMyRequests();
+                };
+                myRequestsSearchInput.addEventListener('input', () => {
+                    if (qTimer) clearTimeout(qTimer);
+                    qTimer = setTimeout(applyQ, 200);
                 });
             }
             const fileInput = requestModal.querySelector('#request-files');
@@ -1551,6 +2186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.classList.add('active');
             });
         });
+        // listeners de admin se manejan en admin.js
     };
 
     initLayout();

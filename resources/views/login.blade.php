@@ -19,6 +19,19 @@
         <script defer src="{{ asset('js/alertas.js') }}"></script>
         <script defer src="{{ asset('js/login.js') }}"></script>
     @endif
+    <link rel="preload" as="image" href="https://socya.org.co/wp-content/uploads/ImagenesTI/background.webp" />
+    <link rel="preload" as="image" href="https://socya.org.co/wp-content/uploads/ImagenesTI/background.png" />
+    @php
+        $loginIllustrationFile = 'Captura de pantalla 2026-02-09 103112.png';
+        $loginIllustrationPngPreload = route('asset.img', ['path' => $loginIllustrationFile]);
+        $webpNameHead = str_replace('.png', '.webp', $loginIllustrationFile);
+        $webpExistsHead = file_exists(public_path('img/' . $webpNameHead)) || file_exists(resource_path('img/' . $webpNameHead));
+        $loginIllustrationWebpPreload = $webpExistsHead ? route('asset.img', ['path' => $webpNameHead]) : null;
+    @endphp
+    @if ($loginIllustrationWebpPreload)
+        <link rel="preload" as="image" href="{{ $loginIllustrationWebpPreload }}" />
+    @endif
+    <link rel="preload" as="image" href="{{ $loginIllustrationPngPreload }}" />
     <script>
         window.AppConfig = {
             baseUrl: "{{ url('/') }}",
@@ -33,11 +46,21 @@
     <div class="login-shell">
         <div class="login-box">
             <div class="login-left">
-                @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-                    <img class="login-illustration" src="{{ \Illuminate\Support\Facades\Vite::asset('resources/img/Captura de pantalla 2026-02-09 103112.png') }}" alt="Ilustración">
-                @else
-                    <img class="login-illustration" src="{{ route('asset.img', ['path' => 'Captura de pantalla 2026-02-09 103112.png']) }}" alt="Ilustración">
-                @endif
+                @php
+                    $loginIllustrationFile = 'Captura de pantalla 2026-02-09 103112.png';
+                    $loginIllustrationUrl = route('asset.img', ['path' => $loginIllustrationFile]);
+                    $webpName = str_replace('.png', '.webp', $loginIllustrationFile);
+                    $webpExists = file_exists(public_path('img/' . $webpName)) || file_exists(resource_path('img/' . $webpName));
+                    $loginIllustrationWebp = $webpExists ? route('asset.img', ['path' => $webpName]) : null;
+                @endphp
+                <picture class="login-illustration-wrap">
+                    @if ($loginIllustrationWebp)
+                        <source type="image/webp" srcset="{{ $loginIllustrationWebp }}">
+                    @endif
+                    <img class="login-illustration" alt="Ilustración" width="480" height="360" loading="lazy" decoding="async"
+                         src="{{ $loginIllustrationUrl }}"
+                         data-src="{{ $loginIllustrationUrl }}">
+                </picture>
             </div>
             <div class="login-right">
                 <div class="login-card">

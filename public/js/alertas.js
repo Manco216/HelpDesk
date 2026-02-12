@@ -14,23 +14,19 @@
     const msg = document.createElement('div');
     msg.className = 'alerta-message';
     msg.textContent = message;
-    const actions = document.createElement('div');
-    actions.className = 'alerta-actions';
-    const btn = document.createElement('button');
-    btn.className = 'alerta-close';
-    btn.type = 'button';
-    btn.textContent = 'Cerrar';
-    actions.appendChild(btn);
+    if (kind === 'success') {
+      icon.innerHTML = '<svg class="alerta-svg" viewBox="0 0 100 100" aria-hidden="true"><circle class="alerta-ring" cx="50" cy="50" r="40" fill="none"></circle><polyline class="alerta-check" points="30,52 43,65 70,38" fill="none"></polyline></svg>';
+    } else if (kind === 'error') {
+      icon.innerHTML = '<svg class="alerta-svg" viewBox="0 0 100 100" aria-hidden="true"><circle class="alerta-ring" cx="50" cy="50" r="40" fill="none"></circle><line class="alerta-x1" x1="30" y1="30" x2="70" y2="70"></line><line class="alerta-x2" x1="70" y1="30" x2="30" y2="70"></line></svg>';
+    }
     body.appendChild(icon);
     body.appendChild(ttl);
     body.appendChild(msg);
     card.appendChild(body);
-    card.appendChild(actions);
     overlay.appendChild(card);
     const close = () => {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     };
-    btn.addEventListener('click', close);
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });

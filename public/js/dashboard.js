@@ -199,21 +199,21 @@ window.addEventListener('load', function () {
         persistWidgets();
     }
 
-    function createChart(type, el) {
+    function createChart(type, el, ctx) {
         if (typeof echarts === 'undefined') {
             return null;
         }
         var chart = echarts.init(el);
-        var baseColor = '#00A0DF';
+        var palette = ['#00A0DF', '#7C3AED', '#1E3A8A'];
+        var baseColor = palette[0];
         var option;
 
         if (type === 'bar') {
-            var dataBar = randomSeries(6, 40, 180);
             option = {
                 grid: { left: 32, right: 16, top: 32, bottom: 32 },
                 xAxis: {
                     type: 'category',
-                    data: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+                    data: [],
                     axisLine: { lineStyle: { color: '#94a3b8' } },
                     axisLabel: { color: '#64748b' }
                 },
@@ -224,15 +224,59 @@ window.addEventListener('load', function () {
                     axisLabel: { color: '#64748b' }
                 },
                 tooltip: { trigger: 'axis' },
-                series: [
-                    {
-                        type: 'bar',
-                        data: dataBar,
-                        itemStyle: { color: baseColor, borderRadius: [4, 4, 0, 0] },
-                        barMaxWidth: 28
-                    }
-                ]
+                legend: { top: 0, textStyle: { color: '#64748b' } },
+                series: []
             };
+            chart.setOption(option);
+            var base = (window.AppConfig && window.AppConfig.baseUrl) ? window.AppConfig.baseUrl.replace(/\/+$/, '') : '';
+            var t = (ctx && (ctx.title || '') || '').toLowerCase();
+            var isMonthly = (t.indexOf('mes x año') !== -1);
+            var url = (base ? base : '') + '/api/dashboard/bars?period=year' + (isMonthly ? '&group=month&limit=12' : '');
+            var overlay = el && el.parentNode ? el.parentNode.querySelector('.widget-state-overlay') : null;
+            if (overlay) { setWidgetState(overlay, 'loading'); }
+            var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            var to = null;
+            if (ctrl) {
+                to = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 15000);
+            }
+            fetch(url, { method: 'GET', signal: ctrl ? ctrl.signal : undefined })
+                .then(function (res) {
+                    if (!res.ok) {
+                        return res.json().catch(function () {
+                            return { error: 'http_error', status: res.status };
+                        });
+                    }
+                    return res.json();
+                })
+                .then(function (data) {
+                    if (to) { clearTimeout(to); }
+                    if (data && data.error) {
+                        var msg = 'Ocurrió un error al cargar la gráfica';
+                        if (data.error === 'unauthorized') msg = 'No autorizado para ver datos del dashboard';
+                        else if (data.error === 'department_not_assigned') msg = 'Tu usuario no tiene departamento asignado';
+                        if (overlay) { setWidgetState(overlay, 'error', msg); }
+                        return;
+                    }
+                    var labels = Array.isArray(data.labels) ? data.labels : [];
+                    var series = Array.isArray(data.series) ? data.series : [];
+                    chart.setOption({
+                        xAxis: { data: labels },
+                        series: series.map(function (s, idx) {
+                            return {
+                                type: 'bar',
+                                name: s.name,
+                                data: s.data,
+                                itemStyle: { color: palette[idx % palette.length], borderRadius: [4, 4, 0, 0] },
+                                barMaxWidth: 28
+                            };
+                        })
+                    });
+                    if (overlay) { setWidgetState(overlay, 'success'); }
+                })
+                .catch(function (err) {
+                    if (to) { clearTimeout(to); }
+                    if (overlay) { setWidgetState(overlay, 'error', 'No se pudo conectar con el servidor'); }
+                });
         } else if (type === 'line') {
             var data = randomSeries(6, 80, 260);
             option = {
@@ -298,12 +342,7 @@ window.addEventListener('load', function () {
                             { value: b, name: 'Mobile' },
                             { value: c, name: 'Otros' }
                         ],
-                        color: [
-                            baseColor,
-                            '#38bdf8',
-                            '#a5b4fc',
-                            '#e5e7eb'
-                        ]
+                        color: palette
                     }
                 ]
             };
@@ -359,7 +398,7 @@ window.addEventListener('load', function () {
                         axisLine: {
                             lineStyle: {
                                 width: 12,
-                                color: gaugeStops('#00A0DF', '#a5b4fc', '#ef4444', 20, 20)
+                                color: gaugeStops(palette[0], palette[1], palette[2], 20, 20)
                             }
                         },
                         pointer: {
@@ -449,7 +488,7 @@ window.addEventListener('load', function () {
         var overlay = item.querySelector('.widget-state-overlay');
         setWidgetState(overlay, 'loading');
 
-        var chart = createChart(type, chartContainer);
+        var chart = createChart(type, chartContainer, config);
         if (!chart) {
             setWidgetState(overlay, 'error');
         } else {
@@ -490,7 +529,8 @@ window.addEventListener('load', function () {
             return null;
         }
         var chart = echarts.init(el);
-        var baseColor = '#00A0DF';
+        var palette = ['#00A0DF', '#7C3AED', '#1E3A8A'];
+        var baseColor = palette[0];
         var option;
 
         if (type === 'bar') {
@@ -567,11 +607,7 @@ window.addEventListener('load', function () {
                             { value: 30, name: 'B' },
                             { value: 25, name: 'C' }
                         ],
-                        color: [
-                            baseColor,
-                            '#38bdf8',
-                            '#a5b4fc'
-                        ]
+                        color: palette
                     }
                 ]
             };
@@ -626,7 +662,7 @@ window.addEventListener('load', function () {
                         axisLine: {
                             lineStyle: {
                                 width: 8,
-                                color: gaugeStops('#00A0DF', '#a5b4fc', '#ef4444', 16, 16)
+                                color: gaugeStops(palette[0], palette[1], palette[2], 16, 16)
                             }
                         },
                         pointer: { show: false },
@@ -698,7 +734,7 @@ window.addEventListener('load', function () {
             var chartContainer = item.querySelector('.widget-chart');
             var overlay = item.querySelector('.widget-state-overlay');
             setWidgetState(overlay, 'loading');
-            var chart = createChart(cfg.type, chartContainer);
+            var chart = createChart(cfg.type, chartContainer, cfg);
             if (!chart) {
                 setWidgetState(overlay, 'error');
             } else {
